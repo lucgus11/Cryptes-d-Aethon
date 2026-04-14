@@ -806,20 +806,16 @@ document.addEventListener('keydown',e=>{
     case '3':useItem(2);break;case '4':useItem(3);break;case '5':useItem(4);break;
   }
 });
+console.log("Test de démarrage du script"); // Pour vérifier si le JS se lance
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('SW OK');
-        // alert('Le Service Worker est bien enregistré !'); 
-      })
-      .catch((err) => {
-        console.log('SW Erreur');
-        alert('Erreur SW : ' + err); 
-      });
-  });
+    alert("Le navigateur supporte le SW !");
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((reg) => alert("SW Enregistré ! Scope: " + reg.scope))
+            .catch((err) => alert("Erreur d'enregistrement : " + err));
+    });
 } else {
-  alert("Ton navigateur ne supporte pas les Service Workers.");
+    alert("Le navigateur NE SUPPORTE PAS le SW");
 }
 // ─── DÉMARRAGE ───────────────────────────────────────────────
 initGame();
