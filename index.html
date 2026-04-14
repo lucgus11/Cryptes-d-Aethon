@@ -809,9 +809,17 @@ document.addEventListener('keydown',e=>{
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then((reg) => console.log('Service Worker enregistré ! Scope:', reg.scope))
-      .catch((err) => console.log('Échec de l\'enregistrement du SW:', err));
+      .then((reg) => {
+        console.log('SW OK');
+        // alert('Le Service Worker est bien enregistré !'); 
+      })
+      .catch((err) => {
+        console.log('SW Erreur');
+        alert('Erreur SW : ' + err); 
+      });
   });
+} else {
+  alert("Ton navigateur ne supporte pas les Service Workers.");
 }
 // ─── DÉMARRAGE ───────────────────────────────────────────────
 initGame();
