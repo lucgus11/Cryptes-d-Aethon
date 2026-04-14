@@ -2,7 +2,7 @@
   "name": "Cryptes d'Aethon",
   "short_name": "Cryptes d'Aethon",
   "description": "Jeu",
-  "start_url": "index.html",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#352B53",
   "theme_color": "#352B53",
