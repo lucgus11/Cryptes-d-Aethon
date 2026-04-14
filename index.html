@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cryptes d'Aethon — Roguelike</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#02010a;
+  color:#b8aed8;
+  font-family:Georgia,'Times New Roman',serif;
+  display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;padding:12px 8px;
+  user-select:none;
+  background-image:radial-gradient(ellipse at 50% 0%, rgba(60,20,100,.18) 0%, transparent 70%);
+}
+h1{
+  font-size:26px;letter-spacing:8px;text-transform:uppercase;font-weight:normal;
+  color:#c8961e;text-shadow:0 0 24px rgba(200,150,30,.5),0 0 60px rgba(200,100,20,.2);
+  margin-bottom:2px;
+}
+.subtitle{font-size:11px;letter-spacing:3px;color:#4a3870;margin-bottom:10px}
+#wrap{display:flex;gap:10px;align-items:flex-start}
+canvas{
+  display:block;
+  border:1px solid #2a1f50;
+  box-shadow:0 0 40px rgba(80,30,140,.35),0 0 80px rgba(40,10,80,.2);
+  flex-shrink:0;
+}
+#side{width:174px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.panel{
+  background:rgba(4,2,16,.9);
+  border:1px solid #1e1540;
+  padding:9px 10px;
+}
+.pt{
+  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:#4a3870;
+  border-bottom:1px solid #120e28;padding-bottom:5px;margin-bottom:7px;
+}
+.sr{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.sl{color:#4a3870}.sv{color:#b8aed8;font-family:'Courier New',monospace}
+.sv.g{color:#c8961e}.sv.r{color:#c03030}
+#hp-bar{height:5px;background:#1a0810;border:1px solid #2a1020;margin-bottom:7px;border-radius:2px}
+#hp-fill{height:100%;background:linear-gradient(90deg,#6b0000,#be1e1e);transition:width .25s;border-radius:2px}
+#xp-bar{height:3px;background:#0a0820;margin-top:2px;margin-bottom:4px}
+#xp-fill{height:100%;background:#4a2880;transition:width .25s}
+.inv-item{
+  font-size:11px;color:#7060a0;padding:3px 0;display:flex;gap:5px;
+  cursor:pointer;border-radius:2px;transition:color .15s;
+  border-bottom:1px solid #0e0820;
+}
+.inv-item:hover{color:#c8961e}.inv-item:last-child{border-bottom:none}
+.ikey{color:#2e2060;font-family:monospace;min-width:14px}
+.isym{min-width:12px;text-align:center}
+#floor-badge{
+  text-align:center;font-size:22px;color:#c8961e;letter-spacing:1px;
+  text-shadow:0 0 16px rgba(200,150,30,.4);margin:4px 0;
+}
+#log-wrap{margin-top:8px;width:792px}
+.pt2{font-size:9px;letter-spacing:2px;color:#2e2060;text-transform:uppercase;margin-bottom:4px;padding-left:1px}
+#log-box{
+  background:rgba(4,2,16,.9);border:1px solid #1e1540;
+  padding:7px 10px;height:90px;overflow-y:auto;
+  font-size:11.5px;line-height:1.65;
+}
+#log-box::-webkit-scrollbar{width:4px}
+#log-box::-webkit-scrollbar-thumb{background:#2a1f50}
+.lm{color:#3a2a60}
+.lm.c{color:#c03030}.lm.p{color:#2e8050}.lm.v{color:#c8961e}.lm.i{color:#3a5080}
+#overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.88);
+  justify-content:center;align-items:center;flex-direction:column;gap:18px;
+  z-index:200;
+}
+#overlay.on{display:flex}
+#overlay h2{font-size:34px;letter-spacing:8px;font-weight:normal}
+#overlay.win h2{color:#c8961e;text-shadow:0 0 40px rgba(200,150,30,.6)}
+#overlay.die h2{color:#b02020;text-shadow:0 0 40px rgba(180,20,20,.6)}
+#overlay p{color:#4a3870;font-size:13px;letter-spacing:2px;text-align:center;line-height:1.8}
+#rbtn{
+  background:none;border:1px solid #c8961e;color:#c8961e;
+  padding:9px 28px;font-family:Georgia,serif;font-size:13px;
+  letter-spacing:3px;cursor:pointer;transition:all .2s;margin-top:4px;
+}
+#rbtn:hover{background:#c8961e;color:#02010a}
+.tip{font-size:10px;color:#2a1f50;text-align:center;margin-top:6px;letter-spacing:1px}
+/* Flash overlay */
+#flash{position:fixed;inset:0;pointer-events:none;z-index:100;opacity:0;transition:opacity .15s}
+#flash.red{background:rgba(180,0,0,.35);opacity:1}
+#flash.gold{background:rgba(200,150,0,.25);opacity:1}
+</style>
+</head>
+<body>
+<h1>⚔ Cryptes d'Aethon ⚔</h1>
+<div class="subtitle">Roguelike · 5 Étages · Tour par Tour</div>
+<div id="wrap">
+  <canvas id="cv" width="792" height="504"></canvas>
+  <div id="side">
+    <div class="panel">
+      <div class="pt">Héros</div>
+      <div id="hp-bar"><div id="hp-fill" style="width:100%"></div></div>
+      <div class="sr"><span class="sl">PV</span><span class="sv r" id="s-hp">—</span></div>
+      <div id="xp-bar"><div id="xp-fill" style="width:0%"></div></div>
+      <div class="sr"><span class="sl">Niveau</span><span class="sv v" id="s-lv">—</span></div>
+      <div class="sr"><span class="sl">Attaque</span><span class="sv" id="s-at">—</span></div>
+      <div class="sr"><span class="sl">Défense</span><span class="sv" id="s-df">—</span></div>
+      <div class="sr"><span class="sl">Or</span><span class="sv g" id="s-gd">—</span></div>
+    </div>
+    <div class="panel">
+      <div class="pt">Étage</div>
+      <div id="floor-badge">1 / 5</div>
+      <div style="text-align:center;font-size:11px;color:#2e2060">Trouver [>] pour descendre</div>
+    </div>
+    <div class="panel">
+      <div class="pt">Inventaire <span style="color:#1e1540">[1-5]</span></div>
+      <div id="inv-list"><div style="color:#1e1540;font-size:11px">Vide</div></div>
+      <div style="color:#1e1540;font-size:10px;margin-top:5px">Max 5 objets · cliquer ou [1-5]</div>
+    </div>
+    <div class="panel">
+      <div class="pt">Contrôles</div>
+      <div style="font-size:10.5px;color:#2e2060;line-height:2">
+        <div>↑↓←→ / ZQSD — Déplacer</div>
+        <div>G — Ramasser un objet</div>
+        <div>E — Descendre [>]</div>
+        <div>Espace — Attendre</div>
+        <div>1-5 — Utiliser objet</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="log-wrap">
+  <div class="pt2">Journal de combat</div>
+  <div id="log-box"></div>
+</div>
+<div class="tip">Combattez en vous déplaçant sur les ennemis · Ramassez les objets avec [G]</div>
+<div id="overlay">
+  <h2 id="ov-title">—</h2>
+  <p id="ov-msg">—</p>
+  <button id="rbtn" onclick="initGame()">RECOMMENCER</button>
+</div>
+<div id="flash"></div>
+
+<script>
+// ================================================================
+//  CRYPTES D'AETHON — Roguelike Tour-par-Tour Complet
+// ================================================================
+
+const cv   = document.getElementById('cv');
+const ctx  = cv.getContext('2d');
+const TS   = 18;   // taille d'une tuile en pixels
+const VW   = 44;   // largeur viewport en tuiles (44*18=792)
+const VH   = 28;   // hauteur viewport en tuiles (28*18=504)
+const MW   = 70;   // largeur de la carte
+const MH   = 38;   // hauteur de la carte
+
+// Types de tuiles
+const T = { VOID:0, WALL:1, FLOOR:2, STAIRS_DOWN:3, STAIRS_UP:4 };
+
+// ─── DONNÉES DES ENNEMIS ──────────────────────────────────────
+const ENEMY_DEF = [
+  {name:'Rat',       sym:'r',color:'#7a5c14',hp:8,  atk:3,  def:0,xp:2, gold:0, min:1},
+  {name:'Gobelin',   sym:'g',color:'#2d9a3e',hp:14, atk:5,  def:1,xp:5, gold:2, min:1},
+  {name:'Squelette', sym:'s',color:'#b0a88a',hp:18, atk:6,  def:2,xp:8, gold:3, min:2},
+  {name:'Orc',       sym:'O',color:'#3a8a3a',hp:28, atk:9,  def:3,xp:13,gold:5, min:2},
+  {name:'Spectre',   sym:'S',color:'#7050b0',hp:22, atk:10, def:1,xp:16,gold:4, min:3},
+  {name:'Troll',     sym:'T',color:'#3a6a2a',hp:45, atk:12, def:5,xp:22,gold:8, min:3},
+  {name:'Nécromant', sym:'N',color:'#8b3aa0',hp:38, atk:14, def:3,xp:28,gold:12,min:4},
+  {name:'Liche',     sym:'L',color:'#c060d0',hp:50, atk:16, def:4,xp:35,gold:15,min:4},
+  {name:'Dragon',    sym:'D',color:'#e02020',hp:90, atk:20, def:8,xp:200,gold:60,min:5,boss:true},
+];
+
+// ─── DONNÉES DES OBJETS ───────────────────────────────────────
+const ITEM_DEF = [
+  {name:'Potion de soin',  sym:'!',color:'#c03030',kind:'potion', val:22,desc:'Restaure ~22-32 PV'},
+  {name:'Grande potion',   sym:'!',color:'#ff7070',kind:'potion', val:45,desc:'Restaure ~45-55 PV'},
+  {name:'Épée rouillée',   sym:'/',color:'#b09030',kind:'weapon', val:3, desc:'+3 Attaque'},
+  {name:'Dague elfique',   sym:'/',color:'#60c0ff',kind:'weapon', val:5, desc:'+5 Attaque'},
+  {name:'Épée de feu',     sym:'/',color:'#ff5010',kind:'weapon', val:9, desc:'+9 Attaque'},
+  {name:'Bouclier de bois',sym:']',color:'#806020',kind:'armor',  val:2, desc:'+2 Défense'},
+  {name:'Armure de cuir',  sym:']',color:'#a07030',kind:'armor',  val:4, desc:'+4 Défense'},
+  {name:'Cotte de mailles',sym:']',color:'#7090b0',kind:'armor',  val:7, desc:'+7 Défense'},
+  {name:'Parchemin de feu',sym:'§',color:'#ff5010',kind:'scroll', val:30,desc:'Brûle ennemis proches (r=5)'},
+  {name:'Parchemin de gel',sym:'§',color:'#50b0ff',kind:'freeze', val:3, desc:'Gèle ennemis proches 3 tours'},
+  {name:'Parchemin de vie',sym:'§',color:'#50d080',kind:'maxhp',  val:20,desc:'+20 PV maximum'},
+  {name:'Pièces d\'or',    sym:'$',color:'#ffd700',kind:'gold',   val:15,desc:'+15 Or (ramassé auto)'},
+];
+
+const ROOM_FLAVOR = [
+  'Les torches mortes laissent place aux ténèbres.',
+  'Des ossements craquent sous vos pieds.',
+  'L\'air sent le soufre et la pourriture.',
+  'Des runes maudites luisent dans l\'obscurité.',
+  'Un silence pesant écrase la pièce.',
+  'L\'humidité colle à votre peau.',
+  'Des toiles d\'araignées couvrent les murs.',
+  'L\'écho de vos pas vous glace le sang.',
+  'Une eau noire suinte entre les pierres.',
+  'Quelque chose a vécu ici. Depuis longtemps.',
+  'Des chaînes rouillées pendent du plafond.',
+  'Des yeux lumineux disparaissent dans l\'ombre.',
+  'Une odeur de mort flotte dans cet endroit.',
+  'Les murs semblent respirer.',
+];
+
+// ─── ÉTAT DU JEU ─────────────────────────────────────────────
+let G = {}; // game state
+
+function initGame() {
+  hideOv();
+  clearLog();
+  G = {
+    floor:  1,
+    player: mkPlayer(),
+    map:    null,
+    ents:   [],
+    items:  [],
+    camX:   0,
+    camY:   0,
+    alive:  true,
+    won:    false,
+    turn:   0,
+  };
+  buildFloor();
+  log('Vous pénétrez dans les Cryptes d\'Aethon...', 'i');
+  log('Trouvez l\'escalier [>] et appuyez sur [E] pour descendre.', 'i');
+}
+
+// ─── JOUEUR ──────────────────────────────────────────────────
+function mkPlayer() {
+  return {
+    x:2,y:2, hp:40,mhp:40, atk:6,def:2,
+    lv:1,xp:0,xpn:15, gold:0, inv:[],
+    sym:'@',color:'#ffd700', id:'player',
+    frozen:0,
+  };
+}
+
+// ─── GÉNÉRATION DE CARTE (BSP) ───────────────────────────────
+function mkMap() {
+  return {
+    w:MW,h:MH,
+    t:  Array.from({length:MH},()=>Array(MW).fill(T.WALL)),
+    vis:Array.from({length:MH},()=>Array(MW).fill(false)),
+    exp:Array.from({length:MH},()=>Array(MW).fill(false)),
+    rooms:[],
+  };
+}
+
+function buildFloor() {
+  const m = mkMap();
+  const leaves = bspSplit({x:1,y:1,w:MW-2,h:MH-2}, 0, 6);
+
+  for (const leaf of leaves) {
+    const mw=7,mh=5;
+    const rw = mw + Math.floor(Math.random()*(Math.max(1,leaf.w-mw-2)));
+    const rh = mh + Math.floor(Math.random()*(Math.max(1,leaf.h-mh-2)));
+    const rx = leaf.x+1+Math.floor(Math.random()*Math.max(1,leaf.w-rw-1));
+    const ry = leaf.y+1+Math.floor(Math.random()*Math.max(1,leaf.h-rh-1));
+    if(rx+rw>=MW||ry+rh>=MH) continue;
+    const room={x:rx,y:ry,w:rw,h:rh,cx:rx+Math.floor(rw/2),cy:ry+Math.floor(rh/2),visited:false};
+    m.rooms.push(room);
+    for(let y=ry;y<ry+rh;y++) for(let x=rx;x<rx+rw;x++) m.t[y][x]=T.FLOOR;
+  }
+
+  // Connecter les salles par corridors
+  const sorted=[...m.rooms].sort((a,b)=>a.cx-b.cx);
+  for(let i=0;i<sorted.length-1;i++){
+    corridor(m,sorted[i],sorted[i+1]);
+    if(Math.random()<0.25&&sorted.length>3){
+      const j=(i+2+Math.floor(Math.random()*(sorted.length-i-2)))%sorted.length;
+      corridor(m,sorted[i],sorted[j]);
+    }
+  }
+
+  if(m.rooms.length===0){m.rooms.push({x:2,y:2,w:10,h:8,cx:7,cy:6,visited:false});for(let y=2;y<10;y++)for(let x=2;x<12;x++)m.t[y][x]=T.FLOOR;}
+
+  const first=m.rooms[0], last=m.rooms[m.rooms.length-1];
+  if(G.floor>1) m.t[first.cy][first.cx]=T.STAIRS_UP;
+  if(G.floor<5) m.t[last.cy][last.cx]=T.STAIRS_DOWN;
+
+  G.map=m;
+  G.player.x=first.cx; G.player.y=first.cy+(G.floor>1?1:0);
+
+  G.ents=[];G.items=[];
+  spawnEnemies(m);
+  spawnItems(m);
+  fov();
+  render();
+  ui();
+}
+
+function bspSplit(rect,depth,maxDepth){
+  const MIN_W=16,MIN_H=12;
+  if(depth>=maxDepth||rect.w<MIN_W||rect.h<MIN_H) return [rect];
+  const canH=rect.h>=MIN_H*2, canV=rect.w>=MIN_W*2;
+  if(!canH&&!canV) return [rect];
+  const splitH=canH&&(!canV||rect.h>rect.w||Math.random()<0.5);
+  if(splitH){
+    const s=Math.floor(rect.h*(0.38+Math.random()*0.24));
+    if(s<MIN_H||rect.h-s<MIN_H) return [rect];
+    return[...bspSplit({x:rect.x,y:rect.y,w:rect.w,h:s},depth+1,maxDepth),
+           ...bspSplit({x:rect.x,y:rect.y+s,w:rect.w,h:rect.h-s},depth+1,maxDepth)];
+  }else{
+    const s=Math.floor(rect.w*(0.38+Math.random()*0.24));
+    if(s<MIN_W||rect.w-s<MIN_W) return [rect];
+    return[...bspSplit({x:rect.x,y:rect.y,w:s,h:rect.h},depth+1,maxDepth),
+           ...bspSplit({x:rect.x+s,y:rect.y,w:rect.w-s,h:rect.h},depth+1,maxDepth)];
+  }
+}
+
+function corridor(m,a,b){
+  let x=a.cx,y=a.cy;
+  const tx=b.cx,ty=b.cy;
+  const carve=(cx,cy)=>{if(m.t[cy]&&m.t[cy][cx]===T.WALL)m.t[cy][cx]=T.FLOOR;};
+  if(Math.random()<0.5){
+    while(x!==tx){x+=x<tx?1:-1;carve(x,y);}
+    while(y!==ty){y+=y<ty?1:-1;carve(x,y);}
+  }else{
+    while(y!==ty){y+=y<ty?1:-1;carve(x,y);}
+    while(x!==tx){x+=x<tx?1:-1;carve(x,y);}
+  }
+}
+
+// ─── SPAWN ENNEMIS ───────────────────────────────────────────
+function spawnEnemies(m){
+  const fl=G.floor;
+  const eligible=ENEMY_DEF.filter(e=>e.min<=fl&&!e.boss);
+  const count=4+fl*2+rnd(4);
+
+  // Boss étage 5
+  if(fl===5){
+    const lr=m.rooms[m.rooms.length-1];
+    const b=ENEMY_DEF[8];
+    G.ents.push({...b,x:lr.cx,y:lr.cy,hp:b.hp,mhp:b.hp,frozen:0,id:uid(),boss:true});
+  }
+
+  for(let i=0;i<count;i++){
+    const ri=1+Math.floor(Math.random()*(m.rooms.length-1));
+    const r=m.rooms[ri];
+    const x=r.x+1+rnd(r.w-2),y=r.y+1+rnd(r.h-2);
+    if(entAt(x,y)||(x===G.player.x&&y===G.player.y)) continue;
+    if(m.t[y][x]!==T.FLOOR) continue;
+    const def=eligible[rnd(eligible.length)];
+    const hp=def.hp+rnd(fl*4);
+    G.ents.push({...def,x,y,hp,mhp:hp,frozen:0,id:uid()});
+  }
+}
+
+// ─── SPAWN OBJETS ────────────────────────────────────────────
+function spawnItems(m){
+  const fl=G.floor;
+  const count=6+rnd(5);
+  const pool=ITEM_DEF.filter(it=>{
+    if(fl<2&&(it.val>=9&&it.kind==='weapon')) return false;
+    if(fl<3&&it.kind==='maxhp') return false;
+    return true;
+  });
+  for(let i=0;i<count;i++){
+    const r=m.rooms[rnd(m.rooms.length)];
+    const x=r.x+1+rnd(r.w-2),y=r.y+1+rnd(r.h-2);
+    if(itemAt(x,y)||!walkable(x,y)) continue;
+    const def=pool[rnd(pool.length)];
+    G.items.push({...def,x,y,id:uid()});
+  }
+}
+
+// ─── CHAMP DE VISION (raycasting) ────────────────────────────
+function fov(){
+  const m=G.map,p=G.player,R=10;
+  for(let y=0;y<m.h;y++) for(let x=0;x<m.w;x++) m.vis[y][x]=false;
+  const RAYS=360;
+  for(let i=0;i<RAYS;i++){
+    const ang=(i/RAYS)*Math.PI*2;
+    const dx=Math.cos(ang),dy=Math.sin(ang);
+    let rx=p.x+.5,ry=p.y+.5;
+    for(let d=0;d<=R;d++){
+      const ix=Math.floor(rx),iy=Math.floor(ry);
+      if(ix<0||ix>=m.w||iy<0||iy>=m.h) break;
+      m.vis[iy][ix]=true;m.exp[iy][ix]=true;
+      if(m.t[iy][ix]===T.WALL) break;
+      rx+=dx;ry+=dy;
+    }
+  }
+}
+
+// ─── RENDU ───────────────────────────────────────────────────
+function render(){
+  if(!G.map) return;
+  const m=G.map,p=G.player;
+  // Caméra centrée sur le joueur
+  G.camX=Math.max(0,Math.min(MW-VW,p.x-Math.floor(VW/2)));
+  G.camY=Math.max(0,Math.min(MH-VH,p.y-Math.floor(VH/2)));
+  const cx=G.camX,cy=G.camY;
+
+  ctx.fillStyle='#000';ctx.fillRect(0,0,cv.width,cv.height);
+
+  // Tuiles
+  for(let ty=0;ty<VH;ty++) for(let tx=0;tx<VW;tx++){
+    const mx=tx+cx,my=ty+cy;
+    const tile=m.t[my]?.[mx]??T.VOID;
+    const vis=m.vis[my]?.[mx]??false;
+    const exp=m.exp[my]?.[mx]??false;
+    const px=tx*TS,py=ty*TS;
+    if(vis) drawLit(px,py,tile);
+    else if(exp) drawDim(px,py,tile);
+  }
+
+  // Objets (visible)
+  for(const it of G.items){
+    if(!m.vis[it.y]?.[it.x]) continue;
+    const tx=it.x-cx,ty=it.y-cy;
+    if(tx<0||tx>=VW||ty<0||ty>=VH) continue;
+    glyph(tx*TS,ty*TS,it.sym,it.color);
+  }
+
+  // Ennemis (visible)
+  for(const e of G.ents){
+    if(!m.vis[e.y]?.[e.x]) continue;
+    const tx=e.x-cx,ty=e.y-cy;
+    if(tx<0||tx>=VW||ty<0||ty>=VH) continue;
+    const col=e.frozen>0?'#60a0d0':e.color;
+    if(e.boss){
+      ctx.fillStyle='rgba(200,20,20,.08)';ctx.fillRect(tx*TS-2,ty*TS-2,TS+4,TS+4);
+    }
+    glyph(tx*TS,ty*TS,e.sym,col);
+    if(e.hp<e.mhp) hpBar(tx*TS,ty*TS,e.hp/e.mhp);
+  }
+
+  // Joueur
+  glyph((p.x-cx)*TS,(p.y-cy)*TS,'@','#ffd700');
+
+  // Minimap (coin supérieur droit)
+  drawMinimap(cx,cy);
+}
+
+function drawLit(px,py,tile){
+  if(tile===T.WALL){
+    ctx.fillStyle='#14102a';ctx.fillRect(px,py,TS,TS);
+    ctx.fillStyle='#221a3e';ctx.fillRect(px,py,TS,1);ctx.fillRect(px,py,1,TS);
+    ctx.fillStyle='#0b0820';ctx.fillRect(px,py+TS-1,TS,1);
+  } else if(tile===T.FLOOR){
+    ctx.fillStyle='#0d0b1e';ctx.fillRect(px,py,TS,TS);
+    ctx.fillStyle='#181530';ctx.fillRect(px+TS/2-1,py+TS/2-1,2,2);
+  } else if(tile===T.STAIRS_DOWN){
+    ctx.fillStyle='#0d0b1e';ctx.fillRect(px,py,TS,TS);
+    glyph(px,py,'>','#c8961e');
+  } else if(tile===T.STAIRS_UP){
+    ctx.fillStyle='#0d0b1e';ctx.fillRect(px,py,TS,TS);
+    glyph(px,py,'<','#4070c0');
+  }
+}
+
+function drawDim(px,py,tile){
+  if(tile===T.WALL){
+    ctx.fillStyle='#080618';ctx.fillRect(px,py,TS,TS);
+  } else if(tile===T.FLOOR){
+    ctx.fillStyle='#060410';ctx.fillRect(px,py,TS,TS);
+  } else if(tile===T.STAIRS_DOWN){
+    ctx.fillStyle='#060410';ctx.fillRect(px,py,TS,TS);
+    ctx.fillStyle='#5a3a10';ctx.font=`bold ${TS-2}px 'Courier New',monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('>',px+TS/2,py+TS/2);
+  } else if(tile===T.STAIRS_UP){
+    ctx.fillStyle='#060410';ctx.fillRect(px,py,TS,TS);
+    ctx.fillStyle='#1a3060';ctx.font=`bold ${TS-2}px 'Courier New',monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('<',px+TS/2,py+TS/2);
+  }
+}
+
+function glyph(px,py,sym,col){
+  ctx.fillStyle=col;
+  ctx.font=`bold ${TS}px 'Courier New',monospace`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(sym,px+TS/2,py+TS/2);
+}
+
+function hpBar(px,py,frac){
+  ctx.fillStyle='#300';ctx.fillRect(px,py,TS,3);
+  ctx.fillStyle=frac>.5?'#0a0':frac>.25?'#a80':'#a00';
+  ctx.fillRect(px,py,Math.max(1,Math.floor(TS*frac)),3);
+}
+
+function drawMinimap(camX,camY){
+  const MSCL=2, MX=cv.width-MW*MSCL-6, MY=6;
+  ctx.fillStyle='rgba(2,1,10,.75)';
+  ctx.fillRect(MX-1,MY-1,MW*MSCL+2,MH*MSCL+2);
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    const t=G.map.t[y][x];
+    const e=G.map.exp[y][x];
+    if(!e) continue;
+    ctx.fillStyle=t===T.WALL?'#1a1438':(t===T.STAIRS_DOWN||t===T.STAIRS_UP)?'#c8961e':'#302850';
+    ctx.fillRect(MX+x*MSCL,MY+y*MSCL,MSCL,MSCL);
+  }
+  // Ennemis sur minimap
+  for(const e of G.ents){
+    if(!G.map.exp[e.y]?.[e.x]) continue;
+    ctx.fillStyle='#c03030';
+    ctx.fillRect(MX+e.x*MSCL,MY+e.y*MSCL,MSCL,MSCL);
+  }
+  // Joueur
+  ctx.fillStyle='#ffd700';
+  ctx.fillRect(MX+G.player.x*MSCL,MY+G.player.y*MSCL,MSCL,MSCL);
+  // Viewport rect
+  ctx.strokeStyle='rgba(200,150,30,.3)';ctx.lineWidth=1;
+  ctx.strokeRect(MX+camX*MSCL,MY+camY*MSCL,VW*MSCL,VH*MSCL);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────
+let _uid=0;
+function uid(){return++_uid}
+function rnd(n){return Math.floor(Math.random()*n)}
+function entAt(x,y){return G.ents.find(e=>e.x===x&&e.y===y)}
+function itemAt(x,y){return G.items.find(i=>i.x===x&&i.y===y)}
+function walkable(x,y){const t=G.map.t[y]?.[x];return t===T.FLOOR||t===T.STAIRS_DOWN||t===T.STAIRS_UP}
+
+// ─── COMBAT ──────────────────────────────────────────────────
+function calcDmg(atk,def){return Math.max(1,atk-def+rnd(5)-1)}
+
+// ─── IA ENNEMIS (BFS) ────────────────────────────────────────
+function bfsStep(sx,sy,tx,ty){
+  const dist=Math.abs(sx-tx)+Math.abs(sy-ty);
+  if(dist>18) return null;
+  const DIRS=[{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  const queue=[{x:sx,y:sy,step:null}];
+  const vis=new Set([`${sx},${sy}`]);
+  let safe=0;
+  while(queue.length&&safe++<400){
+    const cur=queue.shift();
+    for(const d of DIRS){
+      const nx=cur.x+d.dx,ny=cur.y+d.dy;
+      const k=`${nx},${ny}`;
+      if(vis.has(k)) continue;
+      if(nx===tx&&ny===ty) return cur.step??d;
+      if(walkable(nx,ny)&&!entAt(nx,ny)){
+        vis.add(k);queue.push({x:nx,y:ny,step:cur.step??d});
+      }
+    }
+  }
+  return null;
+}
+
+function doEnemyTurns(){
+  const p=G.player;
+  for(const e of [...G.ents]){
+    if(!G.alive) break;
+    if(e.frozen>0){e.frozen--;continue;}
+    const dist=Math.abs(e.x-p.x)+Math.abs(e.y-p.y);
+    const inSight=G.map.vis[e.y]?.[e.x];
+    if(!inSight&&dist>14) continue;
+
+    if(dist===1){
+      // Attaque joueur
+      const dmg=calcDmg(e.atk,p.def);
+      p.hp-=dmg;
+      log(`${e.name} vous frappe pour ${dmg} dégâts! (${Math.max(0,p.hp)}/${p.mhp} PV)`,'c');
+      flash('red');
+      if(p.hp<=0){G.alive=false;gameOver();return;}
+    } else {
+      const step=bfsStep(e.x,e.y,p.x,p.y);
+      if(step){
+        const nx=e.x+step.dx,ny=e.y+step.dy;
+        if(nx===p.x&&ny===p.y){
+          const dmg=calcDmg(e.atk,p.def);
+          p.hp-=dmg;
+          log(`${e.name} vous frappe pour ${dmg} dégâts! (${Math.max(0,p.hp)}/${p.mhp} PV)`,'c');
+          flash('red');
+          if(p.hp<=0){G.alive=false;gameOver();return;}
+        } else if(!entAt(nx,ny)){
+          e.x=nx;e.y=ny;
+        }
+      }
+    }
+  }
+}
+
+// ─── MOUVEMENT JOUEUR ────────────────────────────────────────
+function movePlayer(dx,dy){
+  if(!G.alive) return;
+  const p=G.player;
+  const nx=p.x+dx,ny=p.y+dy;
+  if(nx<0||nx>=MW||ny<0||ny>=MH) return;
+
+  // Ennemi adjacent → attaque
+  const enemy=entAt(nx,ny);
+  if(enemy){
+    const dmg=calcDmg(p.atk,enemy.def);
+    enemy.hp-=dmg;
+    if(enemy.hp<=0){
+      const boss=enemy.boss;
+      log(`Vous tuez ${enemy.name}! (+${enemy.xp} XP, +${enemy.gold} or)`,'c');
+      p.xp+=enemy.xp;p.gold+=enemy.gold;
+      G.ents=G.ents.filter(e=>e.id!==enemy.id);
+      checkLevelUp();
+      if(boss){winGame();return;}
+    } else {
+      log(`Vous frappez ${enemy.name} pour ${dmg} dégâts. (${enemy.hp}/${enemy.mhp} PV)`,'c');
+    }
+    endTurn();return;
+  }
+
+  if(!walkable(nx,ny)) return;
+  p.x=nx;p.y=ny;
+
+  // Auto-ramassage or
+  const gitem=itemAt(p.x,p.y);
+  if(gitem&&gitem.kind==='gold'){
+    p.gold+=gitem.val;
+    log(`Vous ramassez ${gitem.val} pièces d'or.`,'p');
+    G.items=G.items.filter(i=>i.id!==gitem.id);
+  }
+
+  checkRoomEntry();
+  endTurn();
+}
+
+function endTurn(){
+  fov();
+  doEnemyTurns();
+  if(G.alive){render();ui();}
+}
+
+function pickupItem(){
+  if(!G.alive) return;
+  const p=G.player;
+  const it=itemAt(p.x,p.y);
+  if(!it){log('Rien à ramasser ici.','i');return;}
+  if(it.kind==='gold'){
+    p.gold+=it.val;
+    log(`${it.val} pièces d'or ramassées.`,'p');
+    G.items=G.items.filter(i=>i.id!==it.id);
+  } else if(p.inv.length>=5){
+    log('Inventaire plein ! (5/5)','i');
+  } else {
+    p.inv.push(it);
+    G.items=G.items.filter(i=>i.id!==it.id);
+    log(`Ramassé : ${it.name}. ${it.desc}`,'p');
+  }
+  endTurn();
+}
+
+function useItem(idx){
+  if(!G.alive) return;
+  const p=G.player;
+  const it=p.inv[idx];
+  if(!it) return;
+
+  if(it.kind==='potion'){
+    const h=it.val+rnd(10);
+    p.hp=Math.min(p.mhp,p.hp+h);
+    log(`Vous buvez ${it.name}. +${h} PV restaurés.`,'p');
+  } else if(it.kind==='weapon'){
+    p.atk+=it.val;log(`Équipé : ${it.name}. +${it.val} Attaque !`,'v');
+  } else if(it.kind==='armor'){
+    p.def+=it.val;log(`Équipé : ${it.name}. +${it.val} Défense !`,'v');
+  } else if(it.kind==='scroll'){
+    let hit=0;
+    for(const e of G.ents){
+      if(Math.abs(e.x-p.x)+Math.abs(e.y-p.y)<=5){e.hp-=it.val;hit++;}
+    }
+    G.ents=G.ents.filter(e=>e.hp>0);
+    log(`Parchemin de feu : ${hit} ennemi(s) brûlé(s) pour ${it.val} dégâts !`,'c');
+  } else if(it.kind==='freeze'){
+    let hit=0;
+    for(const e of G.ents){
+      if(Math.abs(e.x-p.x)+Math.abs(e.y-p.y)<=6){e.frozen=it.val;hit++;}
+    }
+    log(`Parchemin de gel : ${hit} ennemi(s) gelé(s) pour ${it.val} tours !`,'v');
+  } else if(it.kind==='maxhp'){
+    p.mhp+=it.val;p.hp=Math.min(p.mhp,p.hp+it.val);
+    log(`Parchemin de vie : +${it.val} PV maximum !`,'v');
+    flash('gold');
+  }
+  p.inv.splice(idx,1);
+  endTurn();
+}
+
+function descend(){
+  if(!G.alive) return;
+  const p=G.player;
+  const t=G.map.t[p.y][p.x];
+  if(t!==T.STAIRS_DOWN){log('Vous n\'êtes pas sur un escalier [>].','i');return;}
+  if(G.floor>=5){log('C\'est le dernier étage...','i');return;}
+  G.floor++;
+  log(`──── Étage ${G.floor} ────  L'obscurité s'épaissit...`,'v');
+  buildFloor();
+}
+
+function waitTurn(){
+  if(!G.alive) return;
+  log('Vous attendez...','i');
+  endTurn();
+}
+
+// ─── MONTÉE DE NIVEAU ────────────────────────────────────────
+function checkLevelUp(){
+  const p=G.player;
+  while(p.xp>=p.xpn){
+    p.xp-=p.xpn;p.lv++;p.xpn=Math.floor(p.xpn*1.6);
+    p.mhp+=12;p.hp=Math.min(p.mhp,p.hp+18);
+    p.atk+=2;p.def+=1;
+    log(`✦ NIVEAU ${p.lv} ! +12 PV max, +2 ATK, +1 DEF.`,'v');
+    flash('gold');
+  }
+}
+
+// ─── DÉTECTION SALLE ────────────────────────────────────────
+function checkRoomEntry(){
+  const p=G.player;
+  for(const r of G.map.rooms){
+    if(!r.visited&&p.x>=r.x&&p.x<r.x+r.w&&p.y>=r.y&&p.y<r.y+r.h){
+      r.visited=true;
+      log(ROOM_FLAVOR[rnd(ROOM_FLAVOR.length)],'i');
+      break;
+    }
+  }
+}
+
+// ─── UI ──────────────────────────────────────────────────────
+function ui(){
+  const p=G.player;
+  document.getElementById('s-hp').textContent=`${Math.max(0,p.hp)}/${p.mhp}`;
+  document.getElementById('s-at').textContent=p.atk;
+  document.getElementById('s-df').textContent=p.def;
+  document.getElementById('s-lv').textContent=`${p.lv} (${p.xp}/${p.xpn} XP)`;
+  document.getElementById('s-gd').textContent=p.gold;
+  document.getElementById('floor-badge').textContent=`${G.floor} / 5`;
+  document.getElementById('hp-fill').style.width=`${Math.max(0,p.hp/p.mhp*100)}%`;
+  document.getElementById('xp-fill').style.width=`${p.xp/p.xpn*100}%`;
+
+  const il=document.getElementById('inv-list');
+  il.innerHTML='';
+  if(p.inv.length===0){il.innerHTML='<div style="color:#1e1540;font-size:11px">Vide</div>';return;}
+  for(let i=0;i<p.inv.length;i++){
+    const it=p.inv[i];
+    const d=document.createElement('div');
+    d.className='inv-item';d.title=it.desc;
+    d.innerHTML=`<span class="ikey">[${i+1}]</span><span class="isym" style="color:${it.color}">${it.sym}</span>${it.name}`;
+    d.onclick=()=>useItem(i);
+    il.appendChild(d);
+  }
+}
+
+// ─── LOG ─────────────────────────────────────────────────────
+function log(msg,type){
+  const box=document.getElementById('log-box');
+  const d=document.createElement('div');
+  d.className='lm '+(type||'');
+  d.textContent=msg;
+  box.insertBefore(d,box.firstChild);
+  while(box.children.length>80) box.removeChild(box.lastChild);
+}
+function clearLog(){document.getElementById('log-box').innerHTML='';}
+
+// ─── FLASH ───────────────────────────────────────────────────
+let flashTO=null;
+function flash(type){
+  const f=document.getElementById('flash');
+  f.className=type;
+  clearTimeout(flashTO);
+  flashTO=setTimeout(()=>f.className='',180);
+}
+
+// ─── FIN DE PARTIE ───────────────────────────────────────────
+function gameOver(){
+  render();ui();
+  setTimeout(()=>{
+    const ov=document.getElementById('overlay');
+    ov.className='on die';
+    document.getElementById('ov-title').textContent='VOUS ÊTES MORT';
+    document.getElementById('ov-msg').textContent=
+      `Étage ${G.floor}  ·  Niveau ${G.player.lv}  ·  ${G.player.gold} or\n${G.player.atk} ATK  ·  ${G.player.def} DEF`;
+  },400);
+}
+
+function winGame(){
+  render();ui();
+  setTimeout(()=>{
+    const ov=document.getElementById('overlay');
+    ov.className='on win';
+    document.getElementById('ov-title').textContent='VICTOIRE !';
+    document.getElementById('ov-msg').textContent=
+      `Le Dragon d'Aethon est vaincu !\nNiveau ${G.player.lv}  ·  ${G.player.gold} or  ·  ${G.player.atk} ATK`;
+  },400);
+}
+
+function hideOv(){document.getElementById('overlay').className='';}
+
+// ─── CLAVIER ─────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(!G.player) return;
+  const k=e.key;
+  switch(k){
+    case 'ArrowUp':   case'z':case'Z': e.preventDefault();movePlayer(0,-1);break;
+    case 'ArrowDown': case's':case'S': e.preventDefault();movePlayer(0,1);break;
+    case 'ArrowLeft': case'q':case'Q': e.preventDefault();movePlayer(-1,0);break;
+    case 'ArrowRight':case'd':case'D': e.preventDefault();movePlayer(1,0);break;
+    case 'g':case'G': pickupItem();break;
+    case 'e':case'E': descend();break;
+    case ' ': e.preventDefault();waitTurn();break;
+    case '1':useItem(0);break;case '2':useItem(1);break;
+    case '3':useItem(2);break;case '4':useItem(3);break;case '5':useItem(4);break;
+  }
+});
+
+// ─── DÉMARRAGE ───────────────────────────────────────────────
+initGame();
+</script>
+</body>
+</html>
